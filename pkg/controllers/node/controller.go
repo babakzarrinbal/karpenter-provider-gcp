@@ -28,7 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider"
+	v1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	nodeutils "sigs.k8s.io/karpenter/pkg/utils/node"
+	nodeclaimutils "sigs.k8s.io/karpenter/pkg/utils/nodeclaim"
 	podutil "sigs.k8s.io/karpenter/pkg/utils/pod"
 )
 
@@ -67,7 +69,23 @@ func (c *Controller) Reconcile(ctx context.Context, node *corev1.Node) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	// TODO: it should follow the emptiness disrupt rule of the target nodepool
+	// Get the NodeClaim for this node
+	nc, err := nodeutils.NodeClaimForNode(ctx, c.kubeClient, node)
+	if err != nil {
+		return reconcile.Result{}, nodeutils.IgnoreDuplicateNodeClaimError(nodeutils.IgnoreNodeClaimNotFoundError(err))
+	}
+	if !nodeclaimutils.IsManaged(nc, c.cloudProvider) {
+		return reconcile.Result{}, nil
+	}
+
+	// Check if the NodeClaim is consolidatable
+	consolidatableCond := nc.StatusConditions().Get(v1.ConditionTypeConsolidatable)
+	if consolidatableCond == nil || !consolidatableCond.IsTrue() {
+		// Not yet consolidatable, requeue to check again later
+		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	// Node is consolidatable, proceed with deletion
 	log.FromContext(ctx).Info("deleting empty node", "node", node.Name)
 	// delete the node
 	if err := c.kubeClient.Delete(ctx, node); err != nil {

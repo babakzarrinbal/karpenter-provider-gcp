@@ -163,8 +163,16 @@ func SetProvisioningModel(metadata *compute.Metadata, model string) error {
 	return nil
 }
 
-func PatchUnregisteredTaints(metadata *compute.Metadata) error {
+func PatchUnregisteredTaints(metadata *compute.Metadata, nodeClaim *karpv1.NodeClaim) error {
 	patchedDone := false
+
+	taintArgs := []string{UnregisteredTaintArg}
+	if nodeClaim != nil {
+		for _, taint := range nodeClaim.Spec.StartupTaints {
+			taintArgs = append(taintArgs, fmt.Sprintf("--register-with-taints=%s=%s:%s", taint.Key, taint.Value, taint.Effect))
+		}
+	}
+	taintsStr := strings.Join(taintArgs, " ")
 
 	// Remove nodePoolLabelEntry from kube-labels and kube-env
 	for _, item := range metadata.Items {
@@ -176,7 +184,7 @@ func PatchUnregisteredTaints(metadata *compute.Metadata) error {
 				if strings.HasPrefix(line, "KUBELET_ARGS:") {
 					if !strings.Contains(line, UnregisteredTaintArg) {
 						// Append the taint argument to the existing KUBELET_ARGS line
-						lines[i] = line + " " + UnregisteredTaintArg
+						lines[i] = line + " " + taintsStr
 						patchedDone = true
 					}
 				}

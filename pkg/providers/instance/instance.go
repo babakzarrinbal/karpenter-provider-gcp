@@ -847,7 +847,7 @@ func (p *DefaultProvider) setupInstanceMetadata(instanceMetadata *compute.Metada
 		return fmt.Errorf("failed to render kubelet config metadata: %w", err)
 	}
 
-	if err := metadata.PatchUnregisteredTaints(instanceMetadata); err != nil {
+	if err := metadata.PatchUnregisteredTaints(instanceMetadata, nodeClaim); err != nil {
 		return fmt.Errorf("failed to append unregistered taint to kube-env: %w", err)
 	}
 

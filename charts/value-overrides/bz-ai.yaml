@@ -1,8 +1,0 @@
-serviceAccount:
-  annotations:
-    iam.gke.io/gcp-service-account: >-
-      karpenter-system@gcp-bz-self-hosted-ai.iam.gserviceaccount.com
-controller:
-  settings:
-    projectID: "gcp-bz-self-hosted-ai"
-    clusterName: "bz-ai-cluster"
